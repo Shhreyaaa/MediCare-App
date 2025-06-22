@@ -1,6 +1,6 @@
 # MediCare-App
 
-## Live Demo: https://medi-care-app-hl9m.vercel.app/
+## Live Demo: https://medi-care-app-xvjh.vercel.app/
 
 A web app that helps patients track their medication schedule and allows caretakers to monitor adherence.
 Built using React, Supabase, and TypeScript.
