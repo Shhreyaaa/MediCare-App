@@ -8,7 +8,7 @@ Built using React, Supabase, and TypeScript.
 ## Patient Dashboard
 -Signup / Login / Logout using Supabase authentication.
 
--Basic CRUD operations for managing medications: Add medications (name, dosage, frequency, etc).
+-Basic CRUD operations for Add, view and delete medications (name, dosage, frequency, etc).
 
 -View medications: list of upcoming and completed doses.
 
@@ -21,25 +21,23 @@ Built using React, Supabase, and TypeScript.
 
 -Daily Medication Set:
 
- -Shows Pending if patient hasn't taken medication.
+  -Shows Pending if patient hasn't taken medication.
  
- -Shows Completed with proof photo if medication was taken.
+  -Shows Completed with proof photo if medication was taken.
  
--Monthly Adherence Progress:
-
- -Displays count of Taken, Missed, and Remaining days.
+-Monthly Adherence Progress: Displays count of Taken, Missed, and Remaining days.
  
 -Recent Activity: View a summary of recent medication logs.
 
 -Calendar view: Visual overview of taken / missed days.
 
--Send Reminder Email to patients (pre-filled mailto link).
+-Send Reminder Email to patients.
 
 
 ## Summary:
 1.User login/signup with Supabase Auth
 
-2.Add medications (name, dosage, frequency)
+2.Add, view, delete medications (name, dosage, frequency)
 
 3.View medication list
 
