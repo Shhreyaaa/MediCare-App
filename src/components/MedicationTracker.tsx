@@ -1,28 +1,40 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Image, Camera, Clock } from "lucide-react";
 import { format } from "date-fns";
 
+
+interface MedicationDetail {
+  name: string;
+  dosage: string;
+  frequency: string;
+  time: string;
+  description: string;
+}
+
 interface MedicationTrackerProps {
   date: string;
   isTaken: boolean;
-  onMarkTaken: (date: string, imageFile?: File) => void;
-  isToday: boolean;
+  onMarkTaken: (date: string, imageFile?: File, medicationDetail?:{name:string;dosage:string;frequency:string}) => void;
+  isToday: boolean;  
+  medicationList: MedicationDetail[];
+  
 }
 
-const MedicationTracker = ({ date, isTaken, onMarkTaken, isToday }: MedicationTrackerProps) => {
+const MedicationTracker = ({ date, isTaken, onMarkTaken, isToday, medicationList }: MedicationTrackerProps) => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const dailyMedication = {
-    name: "Daily Medication Set",
-    time: "8:00 AM",
-    description: "Complete set of daily tablets"
-  };
+  // const dailyMedication = {
+  //   name: "Daily Medication Set",
+  //   time: "8:00 AM",
+  //   description: "Complete set of daily tablets"
+  // };
+
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -37,7 +49,12 @@ const MedicationTracker = ({ date, isTaken, onMarkTaken, isToday }: MedicationTr
   };
 
   const handleMarkTaken = () => {
-    onMarkTaken(date, selectedImage || undefined);
+     const firstMedication = medicationList[0]; 
+    onMarkTaken(date, selectedImage || undefined, firstMedication ? {
+      name: firstMedication.name,
+      dosage: firstMedication.dosage,
+      frequency: firstMedication.frequency
+    } : undefined);
     setSelectedImage(null);
     setImagePreview(null);
   };
@@ -59,46 +76,41 @@ const MedicationTracker = ({ date, isTaken, onMarkTaken, isToday }: MedicationTr
           </div>
         </div>
         
-        <Card className="border-green-200 bg-green-50/50">
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-                <Check className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h4 className="font-medium text-green-800">{dailyMedication.name}</h4>
-                <p className="text-sm text-green-600">{dailyMedication.description}</p>
-              </div>
-            </div>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              <Clock className="w-3 h-3 mr-1" />
-              {dailyMedication.time}
-            </Badge>
-          </CardContent>
-        </Card>
+      
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="hover:shadow-md transition-shadow">
-        <CardContent className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-blue-600 font-medium">1</span>
-            </div>
-            <div>
-              <h4 className="font-medium">{dailyMedication.name}</h4>
-              <p className="text-sm text-muted-foreground">{dailyMedication.description}</p>
-            </div>
-          </div>
-          <Badge variant="outline">
-            <Clock className="w-3 h-3 mr-1" />
-            {dailyMedication.time}
-          </Badge>
-        </CardContent>
-      </Card>
+    
+    <div className="space-y-6">      
+      
+
+      {medicationList.map((medication, index) => (
+  <Card key={index} className="hover:shadow-md transition-shadow">
+    <CardContent className="flex items-center justify-between p-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+          <span className="text-blue-600 font-medium">{index + 1}</span>
+        </div>
+        <div>
+          <h4 className="font-medium">{medication.name}</h4>
+          <p className="text-muted-foreground">{medication.description}</p>
+          <p className="text-sm text-muted-foreground">Dosage: {medication.dosage}</p>
+          <p className="text-sm text-muted-foreground">Time: {medication.time}</p>
+        </div>
+      </div>
+      <Badge variant="outline">
+        <Clock className="w-3 h-3 mr-1" />
+        {medication.time}
+      </Badge>
+      
+    </CardContent>
+    
+  </Card>
+  
+))}
+
 
       {/* Image Upload Section */}
       <Card className="border-dashed border-2 border-border/50">

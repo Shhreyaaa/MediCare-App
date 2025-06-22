@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,53 +8,286 @@ import { Calendar } from "@/components/ui/calendar";
 import { Users, Bell, Calendar as CalendarIcon, Mail, AlertTriangle, Check, Clock, Camera } from "lucide-react";
 import NotificationSettings from "./NotificationSettings";
 import { format, subDays, isToday, isBefore, startOfDay } from "date-fns";
+import { supabase } from "@/supabase/supabaseClient";
+import { eachDayOfInterval, startOfMonth} from "date-fns";
+import { useNavigate } from "react-router-dom";
+
+
+
 
 const CaretakerDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [patientEmail, setPatientEmail] = useState("");
+  const [linkMessage, setLinkMessage] = useState("");
+  const [linkedPatients, setLinkedPatients] = useState<any[]>([]);
+  const [currentPatient, setCurrentPatient] = useState<any>(null);
+  const [adherenceRate, setAdherenceRate] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [missedDoses, setMissedDoses] = useState(0);
+  const [takenDates, setTakenDates] = useState<Set<string>>(new Set());
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [todayStatus, setTodayStatus] = useState<"pending" | "completed">("pending");
+  const [remainingCount, setRemainingCount] = useState(0);
+  const [todayActivity, setTodayActivity] = useState<any>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
 
-  // Mock data for demonstration
-  const patientName = "Eleanor Thompson";
-  const adherenceRate = 85;
-  const currentStreak = 5;
-  const missedDoses = 3;
 
-  // Mock data for taken medications (same as in PatientDashboard)
-  const takenDates = new Set([
-    "2024-06-10", "2024-06-09", "2024-06-07", "2024-06-06", 
-    "2024-06-05", "2024-06-04", "2024-06-02", "2024-06-01"
-  ]);
+  const navigate = useNavigate();
 
-  const recentActivity = [
-    { date: "2024-06-10", taken: true, time: "8:30 AM", hasPhoto: true },
-    { date: "2024-06-09", taken: true, time: "8:15 AM", hasPhoto: false },
-    { date: "2024-06-08", taken: false, time: null, hasPhoto: false },
-    { date: "2024-06-07", taken: true, time: "8:45 AM", hasPhoto: true },
-    { date: "2024-06-06", taken: true, time: "8:20 AM", hasPhoto: false },
-  ];
-
-  const dailyMedication = {
-    name: "Daily Medication Set",
-    time: "8:00 AM",
-    status: takenDates.has(format(new Date(), 'yyyy-MM-dd')) ? "completed" : "pending"
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout error:", error.message);
+    } else {
+      navigate("/login");
+    }
   };
+
+  useEffect(() => {
+  const checkSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate("/login");
+    }
+  };
+  checkSession();
+}, [navigate]);
+
+
+const patientName = currentPatient?.profiles?.email
+  ? currentPatient.profiles.email.replace(/@.*$/, "")
+  : "No patient selected";
+
+
+  const fetchLinkedPatients = async () => {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    console.error("Could not fetch caretaker info");
+    return;
+  }
+  const caretakerId = userData.user.id;
+
+ 
+  const { data: links, error: linkError } = await supabase
+    .from("patient_caretaker")
+    .select("patient_id, profiles (id, email)")
+    .eq("caretaker_id", caretakerId);
+
+  if (linkError) {
+    console.error("Error fetching linked patients:", linkError.message);
+    return;
+  }
+
+ 
+  const profiles = await Promise.all(
+    links.map(async (link) => {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .eq("id", link.patient_id)
+        .single();
+
+      if (profileError) {
+        console.error(`Error fetching profile for ${link.patient_id}:`, profileError.message);
+        return { patient_id: link.patient_id, profiles: null };
+      }
+
+      return { patient_id: link.patient_id, profiles: profile };
+    })
+  );
+
+  setLinkedPatients(profiles);
+};
+
+
+
+  const fetchMedicationData = async (patientId: string) => {
+    const { data, error } = await supabase
+      .from("medications")
+      .select("*")
+      .eq("user_id", patientId);
+      console.log("Fetched data:", data);
+     
+
+
+    if (error) {
+      console.error("Error fetching medication data:", error.message);
+      return;
+    }
+
+    if (data) {
+      const datesTaken = new Set(data.filter(d => d.is_taken).map(d => d.date));
+      setTakenDates(datesTaken);
+
+      const adherence = data.length > 0 ? (datesTaken.size / data.length) * 100 : 0;
+      setAdherenceRate(Math.round(adherence));
+
+
+      let streak = 0;
+      let dateCursor = startOfDay(new Date());
+      while (datesTaken.has(format(dateCursor, 'yyyy-MM-dd'))) {
+        streak++;
+        dateCursor = subDays(dateCursor, 1);
+      }
+
+      setCurrentStreak(streak);
+      const sorted = data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setRecentActivity(sorted.slice(0, 5).map(d => ({
+        date: d.date,
+        taken: d.is_taken,
+        proof_photo: d.proof_photo || null,
+      })));
+
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      setTodayStatus(datesTaken.has(todayStr) ? "completed" : "pending");
+
+      const todayData = data.find(d => d.date === todayStr);
+      setTodayActivity(todayData || null);
+    }
+
+
+
+    const today = new Date();
+    const allDaysThisMonth = eachDayOfInterval({
+      start: startOfMonth(today),
+      end: today,
+    }).map(d => format(d, 'yyyy-MM-dd'));
+
+const takenCount = allDaysThisMonth.filter(day => takenDates.has(day)).length;
+const missedCount = allDaysThisMonth.length - takenCount;
+const remainingCount = 30 - allDaysThisMonth.length;
+
+ setMissedDoses(missedCount);
+setRemainingCount(remainingCount);
+
+
+
+  };
+
+  const linkPatientByEmail = async () => {
+    setLinkMessage("");
+
+    if (!patientEmail) {
+      setLinkMessage("Please enter a patient email.");
+      return;
+    }
+
+    const { data: patientProfile, error: fetchError } = await supabase
+      .from("profiles")
+      .select("id, role, email")
+      .eq("email", patientEmail)
+      .single();
+
+    if (fetchError || !patientProfile) {
+      setLinkMessage("No patient found with this email.");
+      return;
+    }
+
+    if (patientProfile.role !== "patient") {
+      setLinkMessage("This email does not belong to a patient.");
+      return;
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      setLinkMessage("Could not fetch caretaker info.");
+      return;
+    }
+    const caretakerId = userData.user.id;
+
+   const { data: existingLink, error: checkError } = await supabase
+  .from("patient_caretaker")
+  .select("patient_id")
+  .eq("patient_id", patientProfile.id)
+  .eq("caretaker_id", caretakerId)
+  .maybeSingle();
+
+if (checkError) {
+  console.error("Error checking existing link:", checkError.message);
+  setLinkMessage("Error checking existing link.");
+  return;
+}
+
+if (existingLink) {
+  setLinkMessage("This patient is already linked.");
+  return;
+}
+
+
+   const { error: insertError } = await supabase
+    .from("patient_caretaker")
+    .insert({
+      patient_id: patientProfile.id,
+      caretaker_id: caretakerId,
+    });
+
+    if (insertError) {
+      setLinkMessage("Failed to link patient: " + insertError.message);
+    } else {
+      setLinkMessage("Patient linked successfully!");
+      setPatientEmail("");
+      fetchLinkedPatients(); 
+    }
+  };
+
+  useEffect(() => {
+    fetchLinkedPatients();
+  }, []);
+
+  useEffect(() => {
+    if (!currentPatient?.patient_id) return;
+
+
+
+    fetchMedicationData(currentPatient.patient_id);
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+    const channel = supabase
+      .channel('medications-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'medications' },
+        (payload) => {
+          const { eventType, new: newRecord } = payload;
+          if (
+            (eventType === "INSERT" || eventType === "UPDATE") &&
+            newRecord.user_id === currentPatient.user_id &&
+            newRecord.date === todayStr &&
+            newRecord.is_taken
+          ) {
+            setTodayStatus("completed");
+            fetchMedicationData(currentPatient.patient_id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentPatient]);
 
   const handleSendReminderEmail = () => {
-    console.log("Sending reminder email to patient...");
-    // Here you would implement email sending functionality
-    alert("Reminder email sent to " + patientName);
+    if (!currentPatient?.profiles?.email) {
+    alert("Please select a patient with a valid email.");
+    return;
+  }
+  window.location.href = `mailto:${currentPatient.profiles.email}?subject=Medication Reminder&body=This is a friendly reminder to take your medication today.`;
   };
 
-  const handleConfigureNotifications = () => {
-    setActiveTab("notifications");
-  };
+  const handleConfigureNotifications = () => setActiveTab("notifications");
+  const handleViewCalendar = () => setActiveTab("calendar");
 
-  const handleViewCalendar = () => {
-    setActiveTab("calendar");
-  };
+
+
+
+
+
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-10 ps-40 pe-40">
       {/* Header Section */}
       <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-2xl p-8 text-white">
         <div className="flex items-center gap-4 mb-6">
@@ -64,6 +297,10 @@ const CaretakerDashboard = () => {
           <div>
             <h2 className="text-3xl font-bold">Caretaker Dashboard</h2>
             <p className="text-white/90 text-lg">Monitoring {patientName}'s medication adherence</p>
+          </div>
+          <div className="ml-auto">
+            <Button  onClick={handleLogout} variant="destructive"> Logout
+            </Button>
           </div>
         </div>
         
@@ -87,6 +324,52 @@ const CaretakerDashboard = () => {
         </div>
       </div>
 
+     <Card>
+  <CardHeader>
+    <CardTitle>Link a Patient</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-3">
+    <input
+      type="email"
+      placeholder="Enter patient email"
+      value={patientEmail}
+      onChange={(e) => setPatientEmail(e.target.value)}
+      className="w-full border p-2 rounded"
+    />
+    <Button onClick={linkPatientByEmail}>
+      Link Patient
+    </Button>
+    {linkMessage && (
+      <div className="text-sm text-blue-600">{linkMessage}</div>
+    )}
+  </CardContent>
+</Card>
+
+<div className="mb-4">
+  <label>Select Linked Patient:</label>
+  <select
+    className="border rounded p-2 w-full"
+    value={currentPatient?.patient_id || ""}
+    onChange={(e) => {
+  const selected = linkedPatients.find(p => p.patient_id === e.target.value);
+  setCurrentPatient(selected);
+  if (selected) {
+    fetchMedicationData(selected.patient_id);
+  }
+    }}
+  >
+    <option value="">Select patient</option>
+    {linkedPatients.map((p) => (
+      <option key={p.patient_id} value={p.patient_id}>
+        {p.profiles?.name || p.profiles?.email}
+      </option>
+    ))}
+  </select>
+</div>
+
+
+
+
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
@@ -109,12 +392,42 @@ const CaretakerDashboard = () => {
               <CardContent>
                 <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
                   <div>
-                    <h4 className="font-medium">{dailyMedication.name}</h4>
-                    <p className="text-sm text-muted-foreground">{dailyMedication.time}</p>
+                    <h4 className="font-medium">Daily Medication Set</h4>
+                    {todayActivity?.proof_photo ? (
+                        <div>
+                          <img
+                            src={todayActivity.proof_photo}
+                            alt="Proof"
+                            className="mt-2 w-20 h-20 object-cover rounded border cursor-pointer"
+                            onClick={() => setShowImageModal(true)}
+                          />
+                          
+                          {showImageModal && (
+                            <div
+                              className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center"
+                              onClick={() => setShowImageModal(false)}
+                            >
+                              <img
+                                src={todayActivity.proof_photo}
+                                alt="Proof Large"
+                                className="max-h-[40%] max-w-[40%] rounded shadow-lg"
+                                onClick={(e) => e.stopPropagation()} // prevent closing when clicking the image itself
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground mt-2">No proof added</p>
+                      )}
+
+
+                    <p className="text-sm text-muted-foreground">{todayActivity?.description}</p>
+
                   </div>
-                  <Badge variant={dailyMedication.status === "pending" ? "destructive" : "secondary"}>
-                    {dailyMedication.status === "pending" ? "Pending" : "Completed"}
+                  <Badge variant={todayStatus === "pending" ? "destructive" : "secondary"}>
+                    {todayStatus === "pending" ? "Pending" : "Completed"}
                   </Badge>
+
                 </div>
               </CardContent>
             </Card>
@@ -167,15 +480,15 @@ const CaretakerDashboard = () => {
                 <Progress value={adherenceRate} className="h-3" />
                 <div className="grid grid-cols-3 gap-4 text-center text-sm">
                   <div>
-                    <div className="font-medium text-green-600">22 days</div>
+                    <div className="font-medium text-green-600">{currentStreak}</div>
                     <div className="text-muted-foreground">Taken</div>
                   </div>
                   <div>
-                    <div className="font-medium text-red-600">3 days</div>
+                    <div className="font-medium text-red-600">{missedDoses}</div>
                     <div className="text-muted-foreground">Missed</div>
                   </div>
                   <div>
-                    <div className="font-medium text-blue-600">5 days</div>
+                    <div className="font-medium text-blue-600">{remainingCount} days</div>
                     <div className="text-muted-foreground">Remaining</div>
                   </div>
                 </div>
