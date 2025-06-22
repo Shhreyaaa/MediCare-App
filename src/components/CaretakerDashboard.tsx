@@ -287,7 +287,7 @@ if (existingLink) {
 
 
   return (
-    <div className="space-y-6 p-10 ps-40 pe-40">
+    <div className="space-y-6 pt-10 ps-20 pe-20">
       {/* Header Section */}
       <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-2xl p-8 text-white">
         <div className="flex items-center gap-4 mb-6">

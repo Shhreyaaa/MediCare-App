@@ -73,12 +73,12 @@ const AuthForm = () => {
       if (error) return setMessage(error.message);
 
       setMessage("Signup successful! Please check your email to confirm before logging in.");
-      // ⛔ Don't insert into profiles yet — wait for confirmed login
+      
     }
   };
 
   return (
-    <div className="max-w-xl mx-auto mt-40 p-4 border rounded space-y-10">
+    <div className="max-w-xl mx-auto mt-20 p-4 border rounded space-y-10">
       <h2 className="text-2xl font-bold">{isLogin ? "Login" : "Sign Up"}</h2>
       <form onSubmit={handleSubmit} className="space-y-3">
         <input

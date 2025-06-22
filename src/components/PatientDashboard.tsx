@@ -166,7 +166,7 @@ useEffect(() => {
 
 
   return (
-    <div className="space-y-6 p-10 ps-40 pe-40">
+    <div className="space-y-6 p-10 ps-20 pe-20">
       
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl p-8 text-white">
