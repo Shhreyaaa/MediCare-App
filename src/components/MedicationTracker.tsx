@@ -21,19 +21,15 @@ interface MedicationTrackerProps {
   onMarkTaken: (date: string, imageFile?: File, medicationDetail?:{name:string;dosage:string;frequency:string}) => void;
   isToday: boolean;  
   medicationList: MedicationDetail[];
-  
+  onDeleteMedication: (index: number) => void;  
 }
 
-const MedicationTracker = ({ date, isTaken, onMarkTaken, isToday, medicationList }: MedicationTrackerProps) => {
+const MedicationTracker = ({ date, isTaken, onMarkTaken, isToday, medicationList, onDeleteMedication  }: MedicationTrackerProps) => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // const dailyMedication = {
-  //   name: "Daily Medication Set",
-  //   time: "8:00 AM",
-  //   description: "Complete set of daily tablets"
-  // };
+
 
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,10 +96,17 @@ const MedicationTracker = ({ date, isTaken, onMarkTaken, isToday, medicationList
           <p className="text-sm text-muted-foreground">Time: {medication.time}</p>
         </div>
       </div>
-      <Badge variant="outline">
+      <div>
+        <Badge variant="outline">
         <Clock className="w-3 h-3 mr-1" />
         {medication.time}
       </Badge>
+
+      <Button style={{ backgroundColor: 'transparent', color: 'red' ,fontSize: '1.3rem'}} onClick={() => onDeleteMedication(index)}>
+          x
+        </Button>
+
+      </div>
       
     </CardContent>
     

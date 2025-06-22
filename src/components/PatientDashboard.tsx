@@ -159,10 +159,9 @@ useEffect(() => {
   fetchTaken();
 }, []);
 
-
-
-
-
+const handleDeleteMedication = (index: number) => {
+  setMedicationList((prev) => prev.filter((_, i) => i !== index));
+};
 
 
   return (
@@ -250,6 +249,7 @@ useEffect(() => {
               <CardTitle className="flex items-center gap-2 text-2xl">
                 <CalendarIcon className="w-6 h-6 text-blue-600" />
                 {isTodaySelected ? "Today's Medication" : `Medication for ${format(selectedDate, 'MMMM d, yyyy')}`}
+                
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -259,6 +259,7 @@ useEffect(() => {
                 onMarkTaken={handleMarkTaken}
                 isToday={isTodaySelected}
                 medicationList={medicationList}
+                onDeleteMedication={handleDeleteMedication}
                 
               />
             </CardContent>
